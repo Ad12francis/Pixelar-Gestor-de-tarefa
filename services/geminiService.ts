@@ -1,20 +1,19 @@
+
 import { GoogleGenAI } from "@google/genai";
 
-const apiKey = process.env.API_KEY || '';
-// Só cria a instância se a chave não for vazia
-const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
+// Always use process.env.API_KEY directly for initialization as per guidelines
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export const polishTaskDescription = async (title: string, rawDescription: string): Promise<string> => {
-  // Se não houver IA configurada, retorna o texto original sem erro
-  if (!ai) {
-    console.warn("IA desativada: Chave de API não configurada.");
-    return rawDescription;
-  }
-
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Você é um gestor de projetos profissional na Pixelar... [resto do seu prompt]`,
+      contents: `Você é um gestor de projetos profissional na Pixelar, uma agência digital criativa. 
+      Refine esta descrição de tarefa para ser mais clara, profissional e orientada a resultados.
+      Mantenha em Português de Angola/Portugal e seja conciso (máximo 3 frases).
+      
+      Título da Tarefa: ${title}
+      Descrição Rascunho: ${rawDescription}`,
     });
 
     return response.text?.trim() || rawDescription;
