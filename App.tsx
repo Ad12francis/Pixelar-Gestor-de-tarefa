@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Task, TaskStatus, AppData } from './types';
 import { STATUS_LABELS, TEAM_MEMBERS } from './constants';
 import { polishTaskDescription } from './services/geminiService';
@@ -17,7 +17,10 @@ import {
   Calendar,
   Briefcase,
   Layers,
-  Menu
+  Menu,
+  Download,
+  Upload,
+  Database
 } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -32,6 +35,7 @@ const App: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isPolishing, setIsPolishing] = useState(false);
   const [activeTab, setActiveTab] = useState<TaskStatus>('TODO');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [newTask, setNewTask] = useState({
     title: '',
@@ -45,6 +49,45 @@ const App: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('pixelar_v3_data', JSON.stringify(data));
   }, [data]);
+
+  // Função para Exportar a Base de Dados
+  const exportDatabase = () => {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `pixelar_db_${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  // Função para Importar a Base de Dados
+  const importDatabase = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const json = JSON.parse(e.target?.result as string);
+          if (json && Array.isArray(json.tasks)) {
+            if (confirm('Isto irá substituir todas as tarefas atuais. Deseja continuar?')) {
+              setData(json);
+              alert('Base de dados sincronizada com sucesso!');
+            }
+          } else {
+            alert('Erro: O arquivo JSON não tem o formato correto.');
+          }
+        } catch (err) {
+          alert('Erro ao processar o arquivo JSON.');
+        }
+      };
+      reader.readAsText(file);
+    }
+    // Reset o input para permitir carregar o mesmo ficheiro novamente se necessário
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
 
   const handleAddTask = (e: React.FormEvent) => {
     e.preventDefault();
@@ -124,7 +167,7 @@ const App: React.FC = () => {
         ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
         <div className="p-8 lg:p-10 h-full flex flex-col">
-          <div className="flex items-center justify-between mb-14">
+          <div className="flex items-center justify-between mb-10">
             <div className="flex items-center gap-4">
               <div className="w-10 h-10 lg:w-12 lg:h-12 rounded-2xl pixel-gradient flex items-center justify-center font-black text-xl lg:text-2xl text-white shadow-lg pixel-shadow">P</div>
               <div>
@@ -137,20 +180,50 @@ const App: React.FC = () => {
             </button>
           </div>
 
-          <nav className="space-y-2 flex-1">
-            <NavItem icon={<LayoutDashboard size={20} />} label="Board Principal" active />
-            <NavItem icon={<Briefcase size={20} />} label="Projetos" />
-            <NavItem icon={<Calendar size={20} />} label="Cronograma" />
-            <NavItem icon={<Layers size={20} />} label="Recursos" />
-            <NavItem icon={<Settings size={20} />} label="Definições" />
+          <nav className="space-y-1.5 flex-1">
+            <NavItem icon={<LayoutDashboard size={18} />} label="Board Principal" active />
+            <NavItem icon={<Briefcase size={18} />} label="Projetos" />
+            <NavItem icon={<Calendar size={18} />} label="Cronograma" />
+            
+            <div className="pt-6 pb-2">
+              <span className="px-5 text-[8px] font-black text-zinc-600 uppercase tracking-[0.3em]">Base de Dados</span>
+            </div>
+            
+            <button 
+              onClick={exportDatabase}
+              className="w-full flex items-center gap-4 px-5 py-3 rounded-xl text-zinc-500 hover:text-emerald-400 hover:bg-emerald-500/5 transition-all font-bold text-sm border border-transparent hover:border-emerald-500/10"
+            >
+              <Download size={18} />
+              Exportar JSON
+            </button>
+            
+            <button 
+              onClick={() => fileInputRef.current?.click()}
+              className="w-full flex items-center gap-4 px-5 py-3 rounded-xl text-zinc-500 hover:text-blue-400 hover:bg-blue-500/5 transition-all font-bold text-sm border border-transparent hover:border-blue-500/10"
+            >
+              <Upload size={18} />
+              Importar JSON
+            </button>
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              onChange={importDatabase} 
+              accept=".json" 
+              className="hidden" 
+            />
+
+            <NavItem icon={<Settings size={18} />} label="Definições" />
           </nav>
 
           <div className="mt-auto pt-6 border-t border-white/5">
             <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5">
-              <p className="text-[9px] text-zinc-600 font-black uppercase tracking-widest mb-1">Status</p>
+              <div className="flex items-center gap-3 mb-2">
+                <Database size={14} className="text-purple-500" />
+                <p className="text-[9px] text-zinc-600 font-black uppercase tracking-widest">Estado Local</p>
+              </div>
               <div className="flex items-center gap-2">
                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
-                <span className="text-xs text-zinc-400 font-bold">Operacional</span>
+                <span className="text-xs text-zinc-400 font-bold">Auto-Save Ativo</span>
               </div>
             </div>
           </div>
@@ -191,7 +264,7 @@ const App: React.FC = () => {
           </button>
         </header>
 
-        {/* Mobile Tab Selector - Apenas em ecrãs pequenos */}
+        {/* Mobile Tab Selector */}
         <div className="lg:hidden px-4 pt-6 pb-2">
           <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide no-scrollbar">
             {columnStatuses.map(status => (
@@ -213,10 +286,7 @@ const App: React.FC = () => {
 
         {/* Board Area */}
         <div className="flex-1 overflow-x-auto p-4 lg:p-12 scroll-smooth">
-          <div className={`flex gap-6 lg:gap-10 h-full ${
-            // No mobile mostramos apenas uma coluna, no desktop as 4
-            'flex-nowrap'
-          }`}>
+          <div className="flex gap-6 lg:gap-10 h-full flex-nowrap">
             {columnStatuses.map(status => (
               <div 
                 key={status} 
@@ -276,13 +346,12 @@ const App: React.FC = () => {
               onClick={() => setIsModalOpen(false)}
               className="absolute top-6 right-6 lg:top-12 lg:right-12 text-zinc-600 hover:text-white transition-all duration-300"
             >
-              {/* Fixed: Removed non-existent lg:size prop which caused a TypeScript error */}
               <X size={24} />
             </button>
 
             <div className="mb-8">
               <h2 className="text-2xl lg:text-4xl font-black text-white mb-2 tracking-tighter">Lançar Tarefa</h2>
-              <p className="text-zinc-500 font-medium text-sm lg:text-lg">Prazos e executores da operação.</p>
+              <p className="text-zinc-500 font-medium text-sm lg:text-lg">Sincronizado automaticamente com a base de dados.</p>
             </div>
             
             <form onSubmit={handleAddTask} className="space-y-5 pb-4">
@@ -397,7 +466,7 @@ const App: React.FC = () => {
 };
 
 const NavItem: React.FC<{ icon: React.ReactNode, label: string, active?: boolean }> = ({ icon, label, active }) => (
-  <button className={`w-full flex items-center gap-4 px-5 py-3.5 rounded-xl transition-all duration-300 font-bold text-sm ${
+  <button className={`w-full flex items-center gap-4 px-5 py-3 rounded-xl transition-all duration-300 font-bold text-sm ${
     active 
       ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20 shadow-lg' 
       : 'text-zinc-600 hover:text-zinc-300 hover:bg-white/[0.03]'
